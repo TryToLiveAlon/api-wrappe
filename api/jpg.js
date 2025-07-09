@@ -1,53 +1,43 @@
-const express = require('express');
+import express from "express";
+import axios from "axios";
+
 const app = express();
-const axios = require('axios');
 
-const IMGBUN_API_KEY = '61d612b99b919f89ae1f52c58e175c99';
+const IMGBUN_API_KEY = "61d612b99b919f89ae1f52c58e175c99";
 
-app.get('/api/jpg', async (req, res) => {
-  const { text, background = '#ffffff', size = 14 } = req.query;
+app.get("/api/jpg", async (req, res) => {
+  const { text, background = "#ffffff", size = 14 } = req.query;
 
   if (!text) {
     return res.json({
       status: "ERROR",
       message: "Missing required 'text' parameter.",
-      direct_link: null
+      direct_link: null,
     });
   }
 
-  const url = `https://api.imgbun.com/jpg?key=${IMGBUN_API_KEY}&text=${encodeURIComponent(text)}&background=${encodeURIComponent(background)}&size=${size}`;
+  const apiUrl = `https://api.imgbun.com/jpg?key=${IMGBUN_API_KEY}&text=${encodeURIComponent(
+    text
+  )}&background=${encodeURIComponent(background)}&size=${size}`;
 
   try {
-    const response = await axios.get(url);
+    const response = await axios.get(apiUrl);
     const result = response.data;
 
-    if (typeof result === "object" && result.direct_link) {
-      return res.json(result);
-    }
-
-    const match = result.match(/<img[^>]+src="([^">]+)"/);
-    if (!match || !match[1]) {
-      return res.json({
-        status: "ERROR",
-        message: "Could not parse image link.",
-        direct_link: null
-      });
-    }
+    const match = typeof result === "string" ? result.match(/<img[^>]+src="([^">]+)"/) : null;
 
     return res.json({
       status: "OK",
       message: null,
-      direct_link: match[1]
+      direct_link: match?.[1] || result.direct_link || null,
     });
-
   } catch (err) {
     return res.json({
       status: "ERROR",
-      message: "Failed to fetch from imgbun.com",
-      direct_link: null
+      message: "Failed to fetch from Imgbun API",
+      direct_link: null,
     });
   }
 });
 
-module.exports = app;
-      
+export default app;
