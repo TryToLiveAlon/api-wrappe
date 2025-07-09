@@ -1,52 +1,51 @@
 export default async function handler(req, res) {
-  const { text, background, size } = req.query;
+  const apiKey = "61d612b99b919f89ae1f52c58e175c99";
 
-  if (!text || !background || !size) {
-    return res.status(400).json({
-      status: "ERROR",
-      message: "Missing required parameters: 'text', 'background', and 'size' are all required.",
-      direct_link: null
-    });
+  const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
+  const colors = [
+    "734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF",
+    "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00",
+    "FFD3EF", "FFFFFF", "000000", "482B10"
+  ];
+
+  const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  const characters = "1234567890AZSXDCFVGBLQWERTYUIOPqazwsxedcrfvtgbyhnmlkj";
+
+  function generateCaptcha(length) {
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
   }
 
-  // Validate background: must be 6-digit hex code like #FF0000
-  const isValidHex = /^#[0-9A-Fa-f]{6}$/.test(background);
-  if (!isValidHex) {
-    return res.status(400).json({
-      status: "ERROR",
-      message: "Background color must be a 6-digit hexadecimal code like #FF0000.",
-      direct_link: null
-    });
-  }
+  const captchaLength = parseInt(req.query.length) || Math.floor(Math.random() * 3) + 5;
+  const captcha = generateCaptcha(captchaLength);
 
-  // Validate size is a number
-  if (isNaN(size)) {
-    return res.status(400).json({
-      status: "ERROR",
-      message: "'size' must be a valid number.",
-      direct_link: null
-    });
-  }
+  const background = randomItem(backgrounds);
+  const color = randomItem(colors);
+  const size = Math.floor(Math.random() * 7) + 12;
 
-  const key = "61d612b99b919f89ae1f52c58e175c99";
-
-  const url = `https://api.imgbun.com/jpg?key=${key}&text=${encodeURIComponent(text)}&background=${background}&size=${size}`;
+  const url = `https://api.imgbun.com/jpg?key=${apiKey}&text=${encodeURIComponent(
+    captcha
+  )}&background=%23${background}&color=${color}&size=${size}`;
 
   try {
     const response = await fetch(url);
     const data = await response.json();
 
     return res.status(200).json({
-      status: data.status || "OK",
-      message: text,
+      status: data.status,
+      captcha,
       direct_link: data.direct_link,
       developer: "https://t.me/TryToLiveAlone"
     });
-  } catch (e) {
+  } catch (err) {
     return res.status(500).json({
       status: "ERROR",
-      message: "Something went wrong while fetching from imgbun.",
-      direct_link: null
+      message: "Could not generate image",
+      error: err.message
     });
   }
-}
+      }
