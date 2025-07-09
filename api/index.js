@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing 'text' parameter" });
   }
 
-  const key = "61d612b99b919f89ae1f52c58e175c99"; // API key hidden from users
+  const key = "61d612b99b919f89ae1f52c58e175c99"; // Hidden from users
   const url = `https://api.imgbun.com/jpg?key=${key}&text=${encodeURIComponent(text)}&background=${encodeURIComponent(background)}&size=${size}`;
 
   try {
@@ -16,6 +16,6 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "public, max-age=86400");
     return res.send(Buffer.from(buffer));
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch image" });
+    res.status(500).json({ error: "Image generation failed." });
   }
 }
