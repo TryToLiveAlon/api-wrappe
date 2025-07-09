@@ -1,17 +1,15 @@
 export default async function handler(req, res) {
-  const { text } = req.query;
-  const background = req.query.background || "#000000";
-  const size = req.query.size || 40;
+  const { text, background, size } = req.query;
 
-  if (!text) {
+  if (!text || !background || !size) {
     return res.status(400).json({
       status: "ERROR",
-      message: "Missing 'text' parameter",
+      message: "Missing required parameters: 'text', 'background', and 'size' are all required.",
       direct_link: null
     });
   }
 
-  // ✅ Must be 6-digit hex code with #
+  // Validate background: must be 6-digit hex code like #FF0000
   const isValidHex = /^#[0-9A-Fa-f]{6}$/.test(background);
   if (!isValidHex) {
     return res.status(400).json({
@@ -21,9 +19,17 @@ export default async function handler(req, res) {
     });
   }
 
+  // Validate size is a number
+  if (isNaN(size)) {
+    return res.status(400).json({
+      status: "ERROR",
+      message: "'size' must be a valid number.",
+      direct_link: null
+    });
+  }
+
   const key = "61d612b99b919f89ae1f52c58e175c99";
 
-  // ✅ DO NOT encode "#" — pass it raw to imgbun
   const url = `https://api.imgbun.com/jpg?key=${key}&text=${encodeURIComponent(text)}&background=${background}&size=${size}`;
 
   try {
