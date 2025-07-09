@@ -28,8 +28,9 @@ export default async function handler(req, res) {
   const size = Math.floor(Math.random() * 7) + 12;
 
   const url = `https://api.imgbun.com/jpg?key=${apiKey}&text=${encodeURIComponent(
-    captcha
-  )}&background=%23${background}&color=${color}&size=${size}`;
+  captcha
+)}&background=%23${background}&size=${size}`;
+
 
   try {
     const response = await fetch(url);
