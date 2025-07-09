@@ -7,32 +7,38 @@ export default async function handler(req, res) {
     return res.status(400).json({
       status: "ERROR",
       message: "Missing 'text' parameter",
-      direct_link: null,
+      direct_link: null
     });
   }
 
-  // Validate background color (must be 6-digit hex starting with "#")
-  function isValidHexColor(hex) {
-    return /^#[0-9A-Fa-f]{6}$/.test(hex);
-  }
-
-  if (!isValidHexColor(background)) {
+  // Ensure background is a valid 6-digit hex
+  const isValidHex = /^#[0-9A-Fa-f]{6}$/.test(background);
+  if (!isValidHex) {
     return res.status(400).json({
       status: "ERROR",
       message: "Background color must be a 6-digit hexadecimal code like #FF0000.",
-      direct_link: null,
+      direct_link: null
     });
   }
 
   const key = "61d612b99b919f89ae1f52c58e175c99";
-  const encodedText = encodeURIComponent(text);
-  const encodedBg = encodeURIComponent(background);
-  const imageUrl = `https://api.imgbun.com/jpg?key=${key}&text=${encodedText}&background=${encodedBg}&size=${size}`;
+  const url = `https://api.imgbun.com/jpg?key=${key}&text=${encodeURIComponent(text)}&background=${background}&size=${size}`;
 
-  return res.status(200).json({
-    status: "OK",
-    message: text,
-    direct_link: imageUrl,
-    developer: "https://t.me/TryToLiveAlone"
-  });
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    return res.status(200).json({
+      status: data.status || "OK",
+      message: text,
+      direct_link: data.direct_link,
+      developer: "https://t.me/TryToLiveAlone"
+    });
+  } catch (e) {
+    return res.status(500).json({
+      status: "ERROR",
+      message: "Something went wrong while fetching from imgbun.",
+      direct_link: null
+    });
+  }
 }
