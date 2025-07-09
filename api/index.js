@@ -1,7 +1,5 @@
 export default async function handler(req, res) {
   const { text } = req.query;
-
-  // Use default or user-supplied values
   const background = req.query.background || "#000000";
   const size = req.query.size || 40;
 
@@ -19,13 +17,17 @@ export default async function handler(req, res) {
   )}&background=${encodeURIComponent(background)}&size=${size}`;
 
   try {
-    const response = await fetch(url);
-    const data = await response.json(); // Assumes imgbun returns JSON
+    // Option 1: Return image content directly
+    // const imageResponse = await fetch(url);
+    // const buffer = await imageResponse.arrayBuffer();
+    // res.setHeader("Content-Type", "image/jpeg");
+    // return res.send(Buffer.from(buffer));
 
+    // Option 2: Return image URL
     return res.status(200).json({
-      status: data.status || "OK",
+      status: "OK",
       message: text,
-      direct_link: data.direct_link
+      direct_link: url
     });
   } catch (error) {
     return res.status(500).json({
