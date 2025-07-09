@@ -9,7 +9,7 @@ export default async function handler(req, res) {
       message: "Missing required 'text' parameter.",
       direct_link: null
     });
-  }
+  } 
 
   const url = `https://api.imgbun.com/jpg?key=61d612b99b919f89ae1f52c58e175c99&text=${encodeURIComponent(text)}&background=${encodeURIComponent(background)}&size=${size}`;
 
