@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // Ensure background is a valid 6-digit hex
+  // ✅ Must be 6-digit hex code with #
   const isValidHex = /^#[0-9A-Fa-f]{6}$/.test(background);
   if (!isValidHex) {
     return res.status(400).json({
@@ -22,6 +22,8 @@ export default async function handler(req, res) {
   }
 
   const key = "61d612b99b919f89ae1f52c58e175c99";
+
+  // ✅ DO NOT encode "#" — pass it raw to imgbun
   const url = `https://api.imgbun.com/jpg?key=${key}&text=${encodeURIComponent(text)}&background=${background}&size=${size}`;
 
   try {
