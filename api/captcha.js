@@ -1,87 +1,99 @@
 import Jimp from "jimp";
-import fetch from "node-fetch";
+import fs from "fs";
+import path from "path";
 import FormData from "form-data";
+import fetch from "node-fetch";
 
 export default async function handler(req, res) {
-  const apiKey = "6bdc3dc178feeed7259ef90fc40b3176"; // imgbb key
+  const imgbbApiKey = "6bdc3dc178feeed7259ef90fc40b3176";
 
-  // Defaults / fallback values
   const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
-  const colors = ["000000", "FFFFFF", "FF0000", "00FF00", "0000FF"];
+  const colors = ["734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF", "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00", "FFD3EF", "FFFFFF", "000000", "482B10"];
   const characters = "1234567890AZSXDCFVGBLQWERTYUIOPqazwsxedcrfvtgbyhnmlkj";
 
   const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const generateCaptcha = (length = 6) => Array.from({ length }, () => randomItem(characters)).join("");
 
-  // Parse user input or use random values
+  const generateCaptcha = (length) => {
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+  };
+
   const captchaLength = parseInt(req.query.length) || Math.floor(Math.random() * 3) + 5;
-  const text = req.query.text || generateCaptcha(captchaLength);
+  const captcha = req.query.text || generateCaptcha(captchaLength);
   const background = req.query.background || randomItem(backgrounds);
+  const size = parseInt(req.query.size) || Math.floor(Math.random() * 4) * 16 + 16;
   const color = req.query.color || randomItem(colors);
-  const size = parseInt(req.query.size) || 32;
 
   const hexRegex = /^[0-9A-Fa-f]{6}$/;
   if (!hexRegex.test(background) || !hexRegex.test(color)) {
     return res.status(400).json({
       status: "ERROR",
-      message: "Color and background must be valid 6-digit hex codes (no #)",
+      message: "Color and background must be 6-digit hex codes (no #)",
       direct_link: null,
     });
   }
 
   try {
-    // Create image
-    const width = text.length * (size + 5);
-    const height = size * 2;
-    const bgColor = Jimp.cssColorToHex(`#${background}`);
-    const textColor = Jimp.cssColorToHex(`#${color}`);
-
-    const image = new Jimp(width, height, bgColor);
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
-
-    // Apply shadow for contrast if background is too light/dark
-    const shadowX = 3, shadowY = 3;
-    const textX = 10, textY = (height - size) / 2;
-
-    const shadowColor = color === "000000" ? "FFFFFF" : "000000";
-    const shadowFont = await Jimp.loadFont(
-      shadowColor === "000000" ? Jimp.FONT_SANS_32_BLACK : Jimp.FONT_SANS_32_WHITE
+    // Determine closest supported font size
+    const validFontSizes = [8, 16, 32, 64, 128];
+    const closestFontSize = validFontSizes.reduce((prev, curr) =>
+      Math.abs(curr - size) < Math.abs(prev - size) ? curr : prev
     );
 
-    image.print(shadowFont, textX + shadowX, textY + shadowY, text);
-    image.print(font, textX, textY, text);
+    const font = await Jimp.loadFont(Jimp[`FONT_SANS_${closestFontSize}_BLACK`]);
+    const shadowFont = await Jimp.loadFont(Jimp[`FONT_SANS_${closestFontSize}_WHITE`]);
 
-    const buffer = await image.getBufferAsync(Jimp.MIME_JPEG);
+    const width = 300;
+    const height = 100;
 
-    // Upload to imgbb
-    const form = new FormData();
-    form.append("image", `data:image/jpeg;base64,${buffer.toString("base64")}`);
-    form.append("key", apiKey);
-    form.append("expiration", "60");
+    const image = new Jimp(width, height, `#${background}`);
 
-    const upload = await fetch("https://api.imgbb.com/1/upload", {
+    const textWidth = Jimp.measureText(font, captcha);
+    const textHeight = Jimp.measureTextHeight(font, captcha, width);
+
+    const x = (width - textWidth) / 2;
+    const y = (height - textHeight) / 2;
+
+    // Add shadow behind text for contrast
+    image.print(shadowFont, x + 1, y + 1, captcha);
+    image.print(font, x, y, captcha);
+
+    const tempPath = path.join("/tmp", `${Date.now()}.jpg`);
+    await image.quality(80).writeAsync(tempPath);
+
+    // Upload to ImgBB
+    const formData = new FormData();
+    formData.append("key", imgbbApiKey);
+    formData.append("image", fs.createReadStream(tempPath));
+
+    const uploadRes = await fetch("https://api.imgbb.com/1/upload", {
       method: "POST",
-      body: form,
+      body: formData,
     });
 
-    const data = await upload.json();
+    const uploadData = await uploadRes.json();
 
-    if (data && data.success && data.data && data.data.url) {
+    fs.unlinkSync(tempPath); // Clean up temp file
+
+    if (uploadData.success) {
       return res.status(200).json({
         status: "OK",
-        captcha: text,
+        captcha,
         background,
         color,
-        size,
-        direct_link: data.data.url,
-        delete_url: data.data.delete_url,
+        size: closestFontSize,
+        direct_link: uploadData.data.url,
+        delete_url: uploadData.data.delete_url,
         developer: "https://t.me/TryToLiveAlone",
       });
     } else {
-      return res.status(500).json({
+      return res.status(400).json({
         status: "ERROR",
-        message: "Failed to upload image",
-        error: data,
+        message: uploadData.error?.message || "Upload failed",
+        direct_link: null,
       });
     }
   } catch (err) {
@@ -91,4 +103,4 @@ export default async function handler(req, res) {
       error: err.message,
     });
   }
-                      }
+      }
