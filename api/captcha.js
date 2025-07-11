@@ -1,24 +1,14 @@
+import { createCanvas } from "@napi-rs/canvas";
+import fetch from "node-fetch";
+
 export default async function handler(req, res) {
-  const apiKeys = [
-    "61d612b99b919f89ae1f52c58e175c99",
-    "a29209cd06a0afbf33a380720adf9fee",
-    "2eeec5fc1b70413fe456b12c6dd669da",
-    "afff7e94ecd29efccd2fc398c6143640",
-    "524a748fa942274408db796e17d98b33",
-    "31e9a6487553ef5067b86f5dabf50edd",
-    "b1b9d45d8398bdc7d3ff04848b81c9b5",
-    "0ee8385036acafa72b4625894648a026",
-    "2f7e2092c311e79370ec9b02d13df62a",
-    "3f9daef4e4a1c73d3aab3db0cf68ea82",
-    "eb645ff0acb6bc936a82df936171f704"
-  ];
+  const apiKey = "6bdc3dc178feeed7259ef90fc40b3176";
 
   const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
   const colors = ["734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF", "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00", "FFD3EF", "FFFFFF", "000000", "482B10"];
   const characters = "1234567890AZSXDCFVGBLQWERTYUIOPqazwsxedcrfvtgbyhnmlkj";
 
   const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const apiKey = randomItem(apiKeys);
 
   const generateCaptcha = (length) => {
     let result = "";
@@ -31,7 +21,7 @@ export default async function handler(req, res) {
   const captchaLength = parseInt(req.query.length) || Math.floor(Math.random() * 3) + 5;
   const captcha = req.query.text || generateCaptcha(captchaLength);
   const background = req.query.background || randomItem(backgrounds);
-  const size = req.query.size || Math.floor(Math.random() * 7) + 12;
+  const size = parseInt(req.query.size) || Math.floor(Math.random() * 7) + 24;
   const color = req.query.color || randomItem(colors);
 
   const hexRegex = /^[0-9A-Fa-f]{6}$/;
@@ -43,28 +33,53 @@ export default async function handler(req, res) {
     });
   }
 
-  const url = `https://api.imgbun.com/jpg?key=${apiKey}&text=${encodeURIComponent(
-    captcha
-  )}&background=${background}&color=${color}&size=${size}`;
-
   try {
-    const response = await fetch(url);
-    const data = await response.json();
+    // Create image
+    const canvas = createCanvas(400, 150);
+    const ctx = canvas.getContext("2d");
 
-    if (data.status === "OK" && data.direct_link) {
+    // Draw background
+    ctx.fillStyle = `#${background}`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw text
+    ctx.fillStyle = `#${color}`;
+    ctx.font = `${size}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(captcha, canvas.width / 2, canvas.height / 2);
+
+    // Convert to base64
+    const buffer = canvas.toBuffer("image/png");
+    const base64Image = buffer.toString("base64");
+
+    // Upload to ImgBB
+    const params = new URLSearchParams();
+    params.append("key", apiKey);
+    params.append("image", base64Image);
+    params.append("expiration", "60");
+
+    const upload = await fetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      body: params
+    });
+
+    const uploadResult = await upload.json();
+
+    if (uploadResult.success) {
       return res.status(200).json({
         status: "OK",
         captcha,
         background,
         color,
         size,
-        direct_link: data.direct_link,
+        direct_link: uploadResult.data.url,
         developer: "https://t.me/TryToLiveAlone"
       });
     } else {
-      return res.status(400).json({
+      return res.status(500).json({
         status: "ERROR",
-        message: data.message || "Unknown error from imgbun",
+        message: uploadResult.error?.message || "Upload failed",
         direct_link: null
       });
     }
@@ -75,4 +90,4 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-          }
+}
