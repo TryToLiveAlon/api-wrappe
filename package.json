@@ -8,8 +8,8 @@
   },
   "dependencies": {
     "form-data": "^4.0.0",
-    "jimp": "^0.22.10",
-    "node-fetch": "^2.6.7"
+  "jimp": "^0.22.10",
+  "node-fetch": "^2.6.11"
   },
   "engines": {
     "node": ">=18"
