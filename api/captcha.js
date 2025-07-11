@@ -1,112 +1,101 @@
+import Jimp from "jimp";
+import FormData from "form-data";
 import fetch from "node-fetch";
-import { createCanvas, loadImage } from "@napi-rs/canvas";
-import { writeFileSync } from "fs";
-import path from "path";
-import os from "os";
 
 export default async function handler(req, res) {
-  const apiKey = "6bdc3dc178feeed7259ef90fc40b3176"; // your imgbb API key
-
-  const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
   const characters = "1234567890AZSXDCFVGBLQWERTYUIOPqazwsxedcrfvtgbyhnmlkj";
+  const defaultBackgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
+  const defaultColors = ["734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF", "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00", "FFD3EF", "FFFFFF", "000000", "482B10"];
 
   const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
-  function generateCaptcha(length) {
+  const generateCaptcha = (length) => {
     let result = "";
     for (let i = 0; i < length; i++) {
       result += characters.charAt(Math.floor(Math.random() * characters.length));
     }
     return result;
-  }
-
-  function getContrastColor(hex) {
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness > 128 ? "000000" : "FFFFFF";
-  }
+  };
 
   const captchaLength = parseInt(req.query.length) || Math.floor(Math.random() * 3) + 5;
   const captcha = req.query.text || generateCaptcha(captchaLength);
-  const background = req.query.background || randomItem(backgrounds);
-  const size = parseInt(req.query.size) || Math.floor(Math.random() * 7) + 28;
-  const color = req.query.color || getContrastColor(background);
+  const background = req.query.background || randomItem(defaultBackgrounds);
+  const size = parseInt(req.query.size) || Math.floor(Math.random() * 7) + 24;
+  const color = req.query.color || randomItem(defaultColors);
 
   const hexRegex = /^[0-9A-Fa-f]{6}$/;
   if (!hexRegex.test(background) || !hexRegex.test(color)) {
     return res.status(400).json({
       status: "ERROR",
       message: "Color and background must be 6-digit hex codes (no #)",
-      direct_link: null,
+      direct_link: null
     });
   }
-
-  // Create canvas
-  const width = 250;
-  const height = 100;
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext("2d");
-
-  // Background
-  ctx.fillStyle = `#${background}`;
-  ctx.fillRect(0, 0, width, height);
-
-  // Text
-  ctx.font = `${size}px sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "#000000"; // black outline
-  ctx.strokeText(captcha, width / 2, 20);
-
-  ctx.fillStyle = `#${color}`;
-  ctx.fillText(captcha, width / 2, 20);
-
-  // Save image to temp file
-  const buffer = canvas.toBuffer("image/jpeg");
-  const tempPath = path.join(os.tmpdir(), `captcha_${Date.now()}.jpg`);
-  writeFileSync(tempPath, buffer);
-
-  // Upload to imgbb
-  const formData = new FormData();
-  formData.append("image", buffer.toString("base64"));
-  formData.append("expiration", "60"); // auto-delete after 1 min
-  formData.append("key", apiKey);
 
   try {
-    const response = await fetch("https://api.imgbb.com/1/upload", {
-      method: "POST",
-      body: formData,
+    const image = new Jimp(250, 100, "#" + background);
+    const font = await Jimp.loadFont(Jimp[`FONT_SANS_${size}_BLACK`]);
+
+    const textWidth = Jimp.measureText(font, captcha);
+    const textHeight = Jimp.measureTextHeight(font, captcha, 250);
+
+    const x = (250 - textWidth) / 2;
+    const y = (100 - textHeight) / 2;
+
+    const textImage = new Jimp(textWidth, textHeight, 0x00000000);
+    await textImage.print(font, 0, 0, {
+      text: captcha,
+      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, textWidth, textHeight);
+
+    const textHex = Jimp.cssColorToHex("#" + color);
+    textImage.scan(0, 0, textImage.bitmap.width, textImage.bitmap.height, function (x, y, idx) {
+      if (this.bitmap.data[idx + 3] > 0) {
+        this.bitmap.data[idx + 0] = (textHex >> 16) & 0xFF; // R
+        this.bitmap.data[idx + 1] = (textHex >> 8) & 0xFF;  // G
+        this.bitmap.data[idx + 2] = textHex & 0xFF;         // B
+      }
     });
 
-    const data = await response.json();
+    image.composite(textImage, x, y);
+    const buffer = await image.getBufferAsync(Jimp.MIME_JPEG);
 
-    if (data.success && data.data && data.data.url) {
-      return res.status(200).json({
-        status: "OK",
-        captcha,
-        background,
-        color,
-        size,
-        direct_link: data.data.url,
-        delete_url: data.data.delete_url,
-        developer: "https://t.me/TryToLiveAlone"
-      });
-    } else {
-      return res.status(400).json({
+    const form = new FormData();
+    form.append("image", buffer.toString("base64"));
+    form.append("key", "6bdc3dc178feeed7259ef90fc40b3176");
+    form.append("expiration", "60");
+
+    const upload = await fetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      body: form
+    });
+
+    const result = await upload.json();
+
+    if (!result.success) {
+      return res.status(500).json({
         status: "ERROR",
-        message: data.error?.message || "Upload failed",
-        direct_link: null,
+        message: "Failed to upload to imgbb",
+        details: result
       });
     }
-  } catch (err) {
+
+    return res.status(200).json({
+      status: "OK",
+      captcha,
+      background,
+      color,
+      size,
+      direct_link: result.data.url,
+      delete_url: result.data.delete_url,
+      developer: "https://t.me/TryToLiveAlone"
+    });
+
+  } catch (error) {
     return res.status(500).json({
       status: "ERROR",
-      message: "Internal error",
-      error: err.message,
+      message: "Internal server error",
+      error: error.message
     });
   }
-}
+  }
