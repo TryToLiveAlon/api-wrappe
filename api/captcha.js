@@ -4,7 +4,7 @@ import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
 
-// Register font
+// Register a custom font (ensure this file exists in your project)
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 
 export default async function handler(req, res) {
@@ -72,12 +72,12 @@ export default async function handler(req, res) {
     });
 
     const uploadData = await uploadRes.json();
-    fs.unlinkSync(tempPath); // Clean up
+    fs.unlinkSync(tempPath); // cleanup
 
     if (uploadData.status === "ok") {
-      const fileInfo = uploadData.data;
-      const files = fileInfo.files || {};
-      const fileUrl = Object.values(files)[0]?.link || fileInfo.directLink || fileInfo.downloadPage;
+      const files = uploadData.data.files || {};
+      const fileObj = Object.values(files)[0];
+      const fileUrl = fileObj?.link || fileObj?.directLink || uploadData.data.downloadPage;
 
       return res.status(200).json({
         status: "OK",
@@ -91,8 +91,8 @@ export default async function handler(req, res) {
     } else {
       return res.status(400).json({
         status: "ERROR",
-        message: "Upload failed on GoFile",
-        direct_link: null
+        message: "Upload failed",
+        direct_link: null,
       });
     }
   } catch (err) {
@@ -102,4 +102,4 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-}
+  }
