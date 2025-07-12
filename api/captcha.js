@@ -1,4 +1,4 @@
-import Jimp from "jimp";
+import { createCanvas, registerFont } from "canvas";
 import fs from "fs";
 import path from "path";
 import FormData from "form-data";
@@ -12,7 +12,6 @@ export default async function handler(req, res) {
   const characters = "1234567890AZSXDCFVGBLQWERTYUIOPqazwsxedcrfvtgbyhnmlkj";
 
   const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
   const generateCaptcha = (length) => {
     let result = "";
     for (let i = 0; i < length; i++) {
@@ -37,34 +36,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Determine closest supported font size
-    const validFontSizes = [8, 16, 32, 64, 128];
-    const closestFontSize = validFontSizes.reduce((prev, curr) =>
-      Math.abs(curr - size) < Math.abs(prev - size) ? curr : prev
-    );
-
-    const font = await Jimp.loadFont(Jimp[`FONT_SANS_${closestFontSize}_BLACK`]);
-    const shadowFont = await Jimp.loadFont(Jimp[`FONT_SANS_${closestFontSize}_WHITE`]);
-
     const width = 300;
     const height = 100;
 
-    const image = new Jimp(width, height, `#${background}`);
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext("2d");
 
-    const textWidth = Jimp.measureText(font, captcha);
-    const textHeight = Jimp.measureTextHeight(font, captcha, width);
+    // Background
+    ctx.fillStyle = `#${background}`;
+    ctx.fillRect(0, 0, width, height);
 
-    const x = (width - textWidth) / 2;
-    const y = (height - textHeight) / 2;
+    // Font (use built-in fonts or register custom one if needed)
+    ctx.font = `${size}px Sans`;
+    ctx.fillStyle = `#${color}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
 
-    // Add shadow behind text for contrast
-    image.print(shadowFont, x + 1, y + 1, captcha);
-    image.print(font, x, y, captcha);
+    // Optional shadow
+    ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.shadowBlur = 2;
 
+    // Draw text
+    ctx.fillText(captcha, width / 2, height / 2);
+
+    const buffer = canvas.toBuffer("image/jpeg");
     const tempPath = path.join("/tmp", `${Date.now()}.jpg`);
-    await image.quality(80).writeAsync(tempPath);
+    fs.writeFileSync(tempPath, buffer);
 
-    // Upload to ImgBB
     const formData = new FormData();
     formData.append("key", imgbbApiKey);
     formData.append("image", fs.createReadStream(tempPath));
@@ -75,8 +75,7 @@ export default async function handler(req, res) {
     });
 
     const uploadData = await uploadRes.json();
-
-    fs.unlinkSync(tempPath); // Clean up temp file
+    fs.unlinkSync(tempPath); // Clean up
 
     if (uploadData.success) {
       return res.status(200).json({
@@ -84,7 +83,7 @@ export default async function handler(req, res) {
         captcha,
         background,
         color,
-        size: closestFontSize,
+        size,
         direct_link: uploadData.data.url,
         delete_url: uploadData.data.delete_url,
         developer: "https://t.me/TryToLiveAlone",
@@ -103,4 +102,4 @@ export default async function handler(req, res) {
       error: err.message,
     });
   }
-      }
+}
