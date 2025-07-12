@@ -4,6 +4,7 @@ import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
 
+// Register font
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 
 export default async function handler(req, res) {
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
     return res.status(400).json({
       status: "ERROR",
       message: "Color and background must be 6-digit hex codes (no #)",
-      direct_link: null
+      direct_link: null,
     });
   }
 
@@ -64,7 +65,6 @@ export default async function handler(req, res) {
     const formData = new FormData();
     formData.append("file", fs.createReadStream(tempPath));
 
-    // Step 1: Upload file
     const uploadRes = await fetch("https://store1.gofile.io/uploadFile", {
       method: "POST",
       body: formData,
@@ -72,16 +72,12 @@ export default async function handler(req, res) {
     });
 
     const uploadData = await uploadRes.json();
-    fs.unlinkSync(tempPath); // clean up
+    fs.unlinkSync(tempPath); // Clean up
 
     if (uploadData.status === "ok") {
-      const fileCode = uploadData.data.code;
-
-      // Step 2: Get real image URL
-      const fileInfoRes = await fetch(`https://api.gofile.io/getUpload?c=${fileCode}`);
-      const fileInfoData = await fileInfoRes.json();
-
-      const fileUrl = Object.values(fileInfoData.data.files)[0].link;
+      const fileInfo = uploadData.data;
+      const files = fileInfo.files || {};
+      const fileUrl = Object.values(files)[0]?.link || fileInfo.directLink || fileInfo.downloadPage;
 
       return res.status(200).json({
         status: "OK",
@@ -106,4 +102,4 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-  }
+}
