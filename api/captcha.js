@@ -6,7 +6,7 @@ import fetch from "node-fetch";
 
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 export default async function handler(req, res) {
-  const imgbbApiKey = "ceb579c86e345ad3f167fdcf5733ab67";
+  const imgbbApiKey = "2237f2a4aea8739ad11422d56417345b";
 
   const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
   const colors = ["734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF", "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00", "FFD3EF", "FFFFFF", "000000", "482B10"];
