@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     ctx.fillRect(0, 0, width, height);
 
     // Font (use built-in fonts or register custom one if needed)
-    ctx.font = `${size}px Sans`;
+    ctx.font = `${size}px sans-serif`;
     ctx.fillStyle = `#${color}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
