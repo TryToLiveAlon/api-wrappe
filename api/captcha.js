@@ -3,8 +3,8 @@ import fs from "fs";
 import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
+import { JSDOM } from "jsdom";
 
-// Register a custom font (ensure this file exists in your project)
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 
 export default async function handler(req, res) {
@@ -74,32 +74,61 @@ export default async function handler(req, res) {
     const uploadData = await uploadRes.json();
     fs.unlinkSync(tempPath); // cleanup
 
-    if (uploadData.status === "ok") {
-      const files = uploadData.data.files || {};
-      const fileObj = Object.values(files)[0];
-      const fileUrl = fileObj?.link || fileObj?.directLink || uploadData.data.downloadPage;
-
-      return res.status(200).json({
-        status: "OK",
-        captcha,
-        background,
-        color,
-        size,
-        direct_link: fileUrl,
-        developer: "https://t.me/TryToLiveAlone"
-      });
-    } else {
+    if (uploadData.status !== "ok") {
       return res.status(400).json({
         status: "ERROR",
         message: "Upload failed",
         direct_link: null,
       });
     }
+
+    // Step 1: Get downloadPage URL
+    const downloadPage = uploadData.data.downloadPage;
+
+    // Step 2: Fetch HTML content of that page
+    const htmlRes = await fetch(downloadPage);
+    const html = await htmlRes.text();
+
+    // Step 3: Parse DOM and extract matching image
+    const dom = new JSDOM(html);
+    const images = dom.window.document.querySelectorAll("img");
+
+    let directLink = null;
+    for (let img of images) {
+      const src = img.getAttribute("src") || "";
+      if (
+        src.startsWith("https://store1.gofile.io/download/web/") &&
+        (src.endsWith(".jpg") || src.endsWith(".jpeg") || src.endsWith(".png"))
+      ) {
+        directLink = src;
+        break;
+      }
+    }
+
+    if (!directLink) {
+      return res.status(404).json({
+        status: "ERROR",
+        message: "No valid image found",
+        direct_link: null,
+      });
+    }
+
+    return res.status(200).json({
+      status: "OK",
+      captcha,
+      background,
+      color,
+      size,
+      direct_link: directLink,
+      developer: "https://t.me/TryToLiveAlone"
+    });
+
   } catch (err) {
     return res.status(500).json({
       status: "ERROR",
       message: "Internal server error",
-      error: err.message
+      error: err.message,
     });
   }
-  }
+}
+  
