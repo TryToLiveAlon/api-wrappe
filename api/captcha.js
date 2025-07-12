@@ -4,6 +4,7 @@ import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
 
+registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 export default async function handler(req, res) {
   const imgbbApiKey = "6bdc3dc178feeed7259ef90fc40b3176";
 
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
     ctx.fillRect(0, 0, width, height);
 
     // Font (use built-in fonts or register custom one if needed)
-    ctx.font = `${size}px sans-serif`;
+    ctx.font = `${size}px "OpenSans"`;
     ctx.fillStyle = `#${color}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
