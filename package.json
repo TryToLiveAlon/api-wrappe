@@ -1,5 +1,5 @@
 {
-  "name": "captcha-api",
+  "name": "captcha-api",
   "version": "1.0.0",
   "type": "module",
   "main": "api/captcha.js",
