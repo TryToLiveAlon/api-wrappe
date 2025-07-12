@@ -61,10 +61,10 @@ export default async function handler(req, res) {
     const tempPath = path.join("/tmp", `${Date.now()}.jpg`);
     fs.writeFileSync(tempPath, buffer);
 
-    // Upload to GoFile
     const formData = new FormData();
     formData.append("file", fs.createReadStream(tempPath));
 
+    // Step 1: Upload file
     const uploadRes = await fetch("https://store1.gofile.io/uploadFile", {
       method: "POST",
       body: formData,
@@ -72,16 +72,24 @@ export default async function handler(req, res) {
     });
 
     const uploadData = await uploadRes.json();
-    fs.unlinkSync(tempPath); // Cleanup
+    fs.unlinkSync(tempPath); // clean up
 
     if (uploadData.status === "ok") {
+      const fileCode = uploadData.data.code;
+
+      // Step 2: Get real image URL
+      const fileInfoRes = await fetch(`https://api.gofile.io/getUpload?c=${fileCode}`);
+      const fileInfoData = await fileInfoRes.json();
+
+      const fileUrl = Object.values(fileInfoData.data.files)[0].link;
+
       return res.status(200).json({
         status: "OK",
         captcha,
         background,
         color,
         size,
-        direct_link: uploadData.data.downloadPage,
+        direct_link: fileUrl,
         developer: "https://t.me/TryToLiveAlone"
       });
     } else {
@@ -98,5 +106,4 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-}
-  
+  }
