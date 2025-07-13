@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
+import cheerio from "cheerio";
 
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 
@@ -43,7 +44,6 @@ export default async function handler(req, res) {
 
     ctx.fillStyle = `#${background}`;
     ctx.fillRect(0, 0, width, height);
-
     ctx.font = `${size}px "OpenSans"`;
     ctx.fillStyle = `#${color}`;
     ctx.textAlign = "center";
@@ -58,22 +58,39 @@ export default async function handler(req, res) {
     const tempPath = path.join("/tmp", `${Date.now()}.jpg`);
     fs.writeFileSync(tempPath, buffer);
 
+    // Step 1: Upload to Gofile
     const formData = new FormData();
     formData.append("file", fs.createReadStream(tempPath));
 
-    const response = await fetch("https://0x0.st", {
+    const uploadRes = await fetch("https://api.gofile.io/uploadFile", {
       method: "POST",
       body: formData,
       headers: formData.getHeaders()
     });
 
-    const text = await response.text();
+    const uploadData = await uploadRes.json();
     fs.unlinkSync(tempPath);
 
-    if (!text.trim().startsWith("https://0x0.st")) {
+    if (!uploadData.success) {
       return res.status(400).json({
         status: "ERROR",
         message: "Upload failed",
+        direct_link: null
+      });
+    }
+
+    // Step 2: Parse HTML to extract image link
+    const pageUrl = uploadData.data.downloadPage;
+    const html = await (await fetch(pageUrl)).text();
+
+    const $ = cheerio.load(html);
+    const imgTag = $("img[src^='https://store1.gofile.io/download/web/']").first();
+    const imageUrl = imgTag.attr("src");
+
+    if (!imageUrl) {
+      return res.status(400).json({
+        status: "ERROR",
+        message: "No valid image found",
         direct_link: null
       });
     }
@@ -84,7 +101,7 @@ export default async function handler(req, res) {
       background,
       color,
       size,
-      direct_link: text.trim(),
+      direct_link: imageUrl,
       developer: "https://t.me/TryToLiveAlone"
     });
 
