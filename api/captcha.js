@@ -4,11 +4,15 @@ import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
 
+// Register font
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 
 export default async function handler(req, res) {
   const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
-  const colors = ["734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF", "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00", "FFD3EF", "FFFFFF", "000000", "482B10"];
+  const colors = [
+    "734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF",
+    "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00", "FFD3EF", "FFFFFF", "000000", "482B10"
+  ];
   const characters = "1234567890AZSXDCFVGBLQWERTYUIOPqazwsxedcrfvtgbyhnmlkj";
 
   const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -68,26 +72,31 @@ export default async function handler(req, res) {
     const uploadRes = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
       body: formData,
-      headers: formData.getHeaders()
+      headers: formData.getHeaders(),
     });
 
     const uploadData = await uploadRes.json();
-    fs.unlinkSync(tempPath); // Cleanup
+    fs.unlinkSync(tempPath); // cleanup
 
     if (uploadData?.data?.url) {
+      const urlParts = uploadData.data.url.split("/").filter(Boolean);
+      const id = urlParts[1];
+      const filename = urlParts[2];
+      const directLink = `https://tmpfiles.org/dl/${id}/${filename}`;
+
       return res.status(200).json({
         status: "OK",
         captcha,
         background,
         color,
         size,
-        direct_link: uploadData.data.url,
+        direct_link: directLink,
         developer: "https://t.me/TryToLiveAlone"
       });
     } else {
       return res.status(400).json({
         status: "ERROR",
-        message: "Upload failed on tmpfiles.org",
+        message: "Upload failed",
         direct_link: null
       });
     }
@@ -98,4 +107,4 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-                      }
+  }
