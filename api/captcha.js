@@ -67,11 +67,26 @@ export default async function handler(req, res) {
     const uploadRes = await fetch("https://file.io", {
       method: "POST",
       body: formData,
-      headers: formData.getHeaders()
+      headers: formData.getHeaders(),
+      redirect: "manual" // 🚨 Prevent auto redirect that breaks readable stream
     });
 
+    // If 3xx status, get `location` header manually
+    if (uploadRes.status >= 300 && uploadRes.status < 400) {
+      const redirectUrl = uploadRes.headers.get("location");
+      return res.status(200).json({
+        status: "OK",
+        captcha,
+        background,
+        color,
+        size,
+        direct_link: redirectUrl,
+        developer: "https://t.me/TryToLiveAlone"
+      });
+    }
+
     const uploadData = await uploadRes.json();
-    fs.unlinkSync(tempPath); // cleanup
+    fs.unlinkSync(tempPath);
 
     if (!uploadData.success || !uploadData.link) {
       return res.status(400).json({
@@ -98,4 +113,4 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-}
+      }
