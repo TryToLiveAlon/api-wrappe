@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
+import * as cheerio from "cheerio"; // ✅ FIXED
+
 
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 
@@ -74,23 +76,45 @@ export default async function handler(req, res) {
     const uploadData = await uploadRes.json();
     fs.unlinkSync(tempPath); // Cleanup
 
-    if (uploadData.status === "ok") {
-      return res.status(200).json({
-        status: "OK",
-        captcha,
-        background,
-        color,
-        size,
-        direct_link: uploadData.data.downloadPage,
-        developer: "https://t.me/TryToLiveAlone"
-      });
-    } else {
+    if (uploadData.status !== "ok") {
       return res.status(400).json({
         status: "ERROR",
         message: "Upload failed on GoFile",
         direct_link: null
       });
     }
+
+    const downloadPage = uploadData.data.downloadPage;
+
+    // Scrape the direct image URL
+    const pageRes = await fetch(downloadPage);
+    const html = await pageRes.text();
+    const $ = cheerio.load(html);
+
+    const imageTag = $("img").toArray().find(img =>
+      $(img).attr("src")?.startsWith("https://store1.gofile.io/download/web/")
+    );
+
+    if (!imageTag) {
+      return res.status(400).json({
+        status: "ERROR",
+        message: "No valid image found",
+        direct_link: null
+      });
+    }
+
+    const directImage = $(imageTag).attr("src");
+
+    return res.status(200).json({
+      status: "OK",
+      captcha,
+      background,
+      color,
+      size,
+      direct_link: directImage,
+      developer: "https://t.me/TryToLiveAlone"
+    });
+
   } catch (err) {
     return res.status(500).json({
       status: "ERROR",
@@ -98,5 +122,5 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-}
-  
+                                                                 }
+    
