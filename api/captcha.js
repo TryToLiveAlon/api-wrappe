@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     return res.status(400).json({
       status: "ERROR",
       message: "Color and background must be 6-digit hex codes (no #)",
-      direct_link: null,
+      direct_link: null
     });
   }
 
@@ -49,12 +49,10 @@ export default async function handler(req, res) {
     ctx.fillStyle = `#${color}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-
     ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     ctx.shadowBlur = 2;
-
     ctx.fillText(captcha, width / 2, height / 2);
 
     const buffer = canvas.toBuffer("image/jpeg");
@@ -64,31 +62,16 @@ export default async function handler(req, res) {
     const formData = new FormData();
     formData.append("file", fs.createReadStream(tempPath));
 
-    const uploadRes = await fetch("https://file.io", {
+    const uploadRes = await fetch("https://0x0.st", {
       method: "POST",
       body: formData,
-      headers: formData.getHeaders(),
-      redirect: "manual" // 🚨 Prevent auto redirect that breaks readable stream
+      headers: formData.getHeaders()
     });
 
-    // If 3xx status, get `location` header manually
-    if (uploadRes.status >= 300 && uploadRes.status < 400) {
-      const redirectUrl = uploadRes.headers.get("location");
-      return res.status(200).json({
-        status: "OK",
-        captcha,
-        background,
-        color,
-        size,
-        direct_link: redirectUrl,
-        developer: "https://t.me/TryToLiveAlone"
-      });
-    }
-
-    const uploadData = await uploadRes.json();
+    const text = await uploadRes.text();
     fs.unlinkSync(tempPath);
 
-    if (!uploadData.success || !uploadData.link) {
+    if (!text.startsWith("https://0x0.st")) {
       return res.status(400).json({
         status: "ERROR",
         message: "Upload failed",
@@ -102,7 +85,7 @@ export default async function handler(req, res) {
       background,
       color,
       size,
-      direct_link: uploadData.link,
+      direct_link: text.trim(),
       developer: "https://t.me/TryToLiveAlone"
     });
 
@@ -113,4 +96,4 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-      }
+}
