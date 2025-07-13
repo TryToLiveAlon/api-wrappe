@@ -3,11 +3,8 @@ import fs from "fs";
 import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
-import * as cheerio from "cheerio";
 
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
-
-const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
 export default async function handler(req, res) {
   const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
@@ -41,6 +38,7 @@ export default async function handler(req, res) {
   try {
     const width = 300;
     const height = 100;
+
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext("2d");
 
@@ -63,11 +61,11 @@ export default async function handler(req, res) {
     const tempPath = path.join("/tmp", `${Date.now()}.jpg`);
     fs.writeFileSync(tempPath, buffer);
 
-    // Upload to GoFile
+    // Upload to tmpfiles.org
     const formData = new FormData();
     formData.append("file", fs.createReadStream(tempPath));
 
-    const uploadRes = await fetch("https://store1.gofile.io/uploadFile", {
+    const uploadRes = await fetch("https://tmpfiles.org/api/v1/upload", {
       method: "POST",
       body: formData,
       headers: formData.getHeaders()
@@ -76,42 +74,20 @@ export default async function handler(req, res) {
     const uploadData = await uploadRes.json();
     fs.unlinkSync(tempPath); // Cleanup
 
-    if (uploadData.status === "ok") {
-      const downloadPage = uploadData.data.downloadPage;
-
-      // Wait for 3 seconds to allow image to appear
-      await wait(3000);
-
-      const htmlRes = await fetch(downloadPage);
-      const htmlText = await htmlRes.text();
-      const $ = cheerio.load(htmlText);
-
-      const imageUrl = $('img')
-        .map((_, el) => $(el).attr("src"))
-        .get()
-        .find(src => src && src.startsWith("https://store1.gofile.io/download/web/"));
-
-      if (!imageUrl) {
-        return res.status(400).json({
-          status: "ERROR",
-          message: "No valid image found on page",
-          direct_link: null
-        });
-      }
-
+    if (uploadData?.data?.url) {
       return res.status(200).json({
         status: "OK",
         captcha,
         background,
         color,
         size,
-        direct_link: imageUrl,
+        direct_link: uploadData.data.url,
         developer: "https://t.me/TryToLiveAlone"
       });
     } else {
       return res.status(400).json({
         status: "ERROR",
-        message: "Upload failed on GoFile",
+        message: "Upload failed on tmpfiles.org",
         direct_link: null
       });
     }
@@ -122,5 +98,4 @@ export default async function handler(req, res) {
       error: err.message
     });
   }
-    }
-                                  
+                      }
