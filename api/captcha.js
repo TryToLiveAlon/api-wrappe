@@ -80,8 +80,8 @@ export default async function handler(req, res) {
 
     if (uploadData?.data?.url) {
       const urlParts = uploadData.data.url.split("/").filter(Boolean);
-      const id = urlParts[1];
-      const filename = urlParts[2];
+      const id = urlParts[2];
+      const filename = urlParts[3];
       const directLink = `https://tmpfiles.org/dl/${id}/${filename}`;
 
       return res.status(200).json({
