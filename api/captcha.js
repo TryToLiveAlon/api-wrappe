@@ -3,7 +3,6 @@ import fs from "fs";
 import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
-import * as cheerio from "cheerio"; // ✅ FIXED import
 
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 
@@ -32,7 +31,7 @@ export default async function handler(req, res) {
     return res.status(400).json({
       status: "ERROR",
       message: "Color and background must be 6-digit hex codes (no #)",
-      direct_link: null,
+      direct_link: null
     });
   }
 
@@ -50,65 +49,54 @@ export default async function handler(req, res) {
     ctx.fillStyle = `#${color}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+
     ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     ctx.shadowBlur = 2;
+
     ctx.fillText(captcha, width / 2, height / 2);
 
     const buffer = canvas.toBuffer("image/jpeg");
     const tempPath = path.join("/tmp", `${Date.now()}.jpg`);
     fs.writeFileSync(tempPath, buffer);
 
+    // Upload to GoFile
     const formData = new FormData();
     formData.append("file", fs.createReadStream(tempPath));
 
-    const uploadRes = await fetch("https://api.gofile.io/uploadFile", {
+    const uploadRes = await fetch("https://store1.gofile.io/uploadFile", {
       method: "POST",
       body: formData,
-      headers: formData.getHeaders(),
+      headers: formData.getHeaders()
     });
 
     const uploadData = await uploadRes.json();
-    fs.unlinkSync(tempPath);
+    fs.unlinkSync(tempPath); // Cleanup
 
-    if (!uploadData.success) {
+    if (uploadData.status === "ok") {
+      return res.status(200).json({
+        status: "OK",
+        captcha,
+        background,
+        color,
+        size,
+        direct_link: uploadData.data.downloadPage,
+        developer: "https://t.me/TryToLiveAlone"
+      });
+    } else {
       return res.status(400).json({
         status: "ERROR",
-        message: "Upload failed",
-        direct_link: null,
+        message: "Upload failed on GoFile",
+        direct_link: null
       });
     }
-
-    const pageUrl = uploadData.data.downloadPage;
-    const html = await (await fetch(pageUrl)).text();
-
-    const $ = cheerio.load(html);
-    const imgTag = $("img[src^='https://store1.gofile.io/download/web/']").first();
-    const imageUrl = imgTag.attr("src");
-
-    if (!imageUrl) {
-      return res.status(400).json({
-        status: "ERROR",
-        message: "No valid image found",
-        direct_link: null,
-      });
-    }
-
-    return res.status(200).json({
-      status: "OK",
-      captcha,
-      background,
-      color,
-      size,
-      direct_link: imageUrl,
-      developer: "https://t.me/TryToLiveAlone",
-    });
   } catch (err) {
     return res.status(500).json({
       status: "ERROR",
       message: "Internal server error",
-      error: err.message,
+      error: err.message
     });
   }
 }
+  
