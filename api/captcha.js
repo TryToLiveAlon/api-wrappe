@@ -3,113 +3,112 @@ import fs from "fs";
 import path from "path";
 import FormData from "form-data";
 import fetch from "node-fetch";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio"; // ✅ FIXED import
 
 registerFont(path.resolve('./fonts/OpenSans-Regular.ttf'), { family: 'OpenSans' });
 
 export default async function handler(req, res) {
-  const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
-  const colors = ["734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF", "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00", "FFD3EF", "FFFFFF", "000000", "482B10"];
-  const characters = "1234567890AZSXDCFVGBLQWERTYUIOPqazwsxedcrfvtgbyhnmlkj";
+  const backgrounds = ["34D2E8", "F7D600", "14DE32", "B94BA6", "E12727", "98A045"];
+  const colors = ["734646", "FFFF00", "00FF00", "FF0000", "00FFFF", "0000FF", "FF9000", "FF00FF", "6E00FF", "0F7209", "CCFF00", "FFD3EF", "FFFFFF", "000000", "482B10"];
+  const characters = "1234567890AZSXDCFVGBLQWERTYUIOPqazwsxedcrfvtgbyhnmlkj";
 
-  const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const generateCaptcha = (length) => {
-    let result = "";
-    for (let i = 0; i < length; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-  };
+  const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const generateCaptcha = (length) => {
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+  };
 
-  const captchaLength = parseInt(req.query.length) || Math.floor(Math.random() * 3) + 5;
-  const captcha = req.query.text || generateCaptcha(captchaLength);
-  const background = req.query.background || randomItem(backgrounds);
-  const size = parseInt(req.query.size) || Math.floor(Math.random() * 4) * 16 + 16;
-  const color = req.query.color || randomItem(colors);
+  const captchaLength = parseInt(req.query.length) || Math.floor(Math.random() * 3) + 5;
+  const captcha = req.query.text || generateCaptcha(captchaLength);
+  const background = req.query.background || randomItem(backgrounds);
+  const size = parseInt(req.query.size) || Math.floor(Math.random() * 4) * 16 + 16;
+  const color = req.query.color || randomItem(colors);
 
-  const hexRegex = /^[0-9A-Fa-f]{6}$/;
-  if (!hexRegex.test(background) || !hexRegex.test(color)) {
-    return res.status(400).json({
-      status: "ERROR",
-      message: "Color and background must be 6-digit hex codes (no #)",
-      direct_link: null
-    });
-  }
+  const hexRegex = /^[0-9A-Fa-f]{6}$/;
+  if (!hexRegex.test(background) || !hexRegex.test(color)) {
+    return res.status(400).json({
+      status: "ERROR",
+      message: "Color and background must be 6-digit hex codes (no #)",
+      direct_link: null,
+    });
+  }
 
-  try {
-    const width = 300;
-    const height = 100;
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext("2d");
+  try {
+    const width = 300;
+    const height = 100;
 
-    ctx.fillStyle = `#${background}`;
-    ctx.fillRect(0, 0, width, height);
-    ctx.font = `${size}px "OpenSans"`;
-    ctx.fillStyle = `#${color}`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-    ctx.shadowBlur = 2;
-    ctx.fillText(captcha, width / 2, height / 2);
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext("2d");
 
-    const buffer = canvas.toBuffer("image/jpeg");
-    const tempPath = path.join("/tmp", `${Date.now()}.jpg`);
-    fs.writeFileSync(tempPath, buffer);
+    ctx.fillStyle = `#${background}`;
+    ctx.fillRect(0, 0, width, height);
 
-    // Step 1: Upload to Gofile
-    const formData = new FormData();
-    formData.append("file", fs.createReadStream(tempPath));
+    ctx.font = `${size}px "OpenSans"`;
+    ctx.fillStyle = `#${color}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.shadowBlur = 2;
+    ctx.fillText(captcha, width / 2, height / 2);
 
-    const uploadRes = await fetch("https://api.gofile.io/uploadFile", {
-      method: "POST",
-      body: formData,
-      headers: formData.getHeaders()
-    });
+    const buffer = canvas.toBuffer("image/jpeg");
+    const tempPath = path.join("/tmp", `${Date.now()}.jpg`);
+    fs.writeFileSync(tempPath, buffer);
 
-    const uploadData = await uploadRes.json();
-    fs.unlinkSync(tempPath);
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(tempPath));
 
-    if (!uploadData.success) {
-      return res.status(400).json({
-        status: "ERROR",
-        message: "Upload failed",
-        direct_link: null
-      });
-    }
+    const uploadRes = await fetch("https://api.gofile.io/uploadFile", {
+      method: "POST",
+      body: formData,
+      headers: formData.getHeaders(),
+    });
 
-    // Step 2: Parse HTML to extract image link
-    const pageUrl = uploadData.data.downloadPage;
-    const html = await (await fetch(pageUrl)).text();
+    const uploadData = await uploadRes.json();
+    fs.unlinkSync(tempPath);
 
-    const $ = cheerio.load(html);
-    const imgTag = $("img[src^='https://store1.gofile.io/download/web/']").first();
-    const imageUrl = imgTag.attr("src");
+    if (!uploadData.success) {
+      return res.status(400).json({
+        status: "ERROR",
+        message: "Upload failed",
+        direct_link: null,
+      });
+    }
 
-    if (!imageUrl) {
-      return res.status(400).json({
-        status: "ERROR",
-        message: "No valid image found",
-        direct_link: null
-      });
-    }
+    const pageUrl = uploadData.data.downloadPage;
+    const html = await (await fetch(pageUrl)).text();
 
-    return res.status(200).json({
-      status: "OK",
-      captcha,
-      background,
-      color,
-      size,
-      direct_link: imageUrl,
-      developer: "https://t.me/TryToLiveAlone"
-    });
+    const $ = cheerio.load(html);
+    const imgTag = $("img[src^='https://store1.gofile.io/download/web/']").first();
+    const imageUrl = imgTag.attr("src");
 
-  } catch (err) {
-    return res.status(500).json({
-      status: "ERROR",
-      message: "Internal server error",
-      error: err.message
-    });
-  }
+    if (!imageUrl) {
+      return res.status(400).json({
+        status: "ERROR",
+        message: "No valid image found",
+        direct_link: null,
+      });
+    }
+
+    return res.status(200).json({
+      status: "OK",
+      captcha,
+      background,
+      color,
+      size,
+      direct_link: imageUrl,
+      developer: "https://t.me/TryToLiveAlone",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status: "ERROR",
+      message: "Internal server error",
+      error: err.message,
+    });
+  }
 }
